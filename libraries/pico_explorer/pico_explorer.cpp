@@ -15,7 +15,7 @@ const uint8_t MOTOR2P = 11;
 namespace pimoroni {
 
   PicoExplorer::PicoExplorer(uint16_t *buf)
-    : PicoGraphics(WIDTH, HEIGHT, buf), screen(WIDTH, HEIGHT, buf)  {
+    : PicoGraphics(WIDTH, HEIGHT, buf), screen(WIDTH, HEIGHT, buf, PICO_EXPLORER_ONBOARD)  {
     __fb = buf;
   }
 
@@ -95,7 +95,7 @@ namespace pimoroni {
     }
   }
 
-  void PicoExplorer::set_audio_pin(uint8_t pin) {
+  void PicoExplorer::set_audio_pin(uint pin) {
     pwm_config tone_pwm_cfg = pwm_get_default_config();
 
     // calculate the pwm wrap value for this frequency

@@ -2,50 +2,55 @@
 
 #include "hardware/spi.h"
 #include "hardware/gpio.h"
+#include "../../common/pimoroni_common.hpp"
 
 namespace pimoroni {
 
   class ST7789 {
-    spi_inst_t *spi = spi0;
+    spi_inst_t *spi = PIMORONI_SPI_DEFAULT_INSTANCE;
 
-    uint32_t dma_channel;
 
+    //--------------------------------------------------
+    // Variables
+    //--------------------------------------------------
+  private:
     // screen properties
     uint16_t width;
     uint16_t height;
     uint16_t row_stride;
+    uint32_t dma_channel;
 
     // interface pins with our standard defaults where appropriate
-    int8_t cs     = 17;
-    int8_t dc     = 16;
-    int8_t sck    = 18;
-    int8_t mosi   = 19;
-    int8_t miso   = -1; // we generally don't use this pin
-    int8_t bl     = 20;
-    int8_t vsync  = -1; // only available on some products
+    uint cs     = SPI_BG_FRONT_CS;
+    uint dc     = SPI_DEFAULT_MISO;
+    uint sck    = SPI_DEFAULT_SCK;
+    uint mosi   = SPI_DEFAULT_MOSI;
+    uint miso   = PIN_UNUSED; // used as data/command
+    uint bl     = SPI_BG_FRONT_PWM;
+    uint vsync  = PIN_UNUSED; // only available on some products
 
-    uint32_t spi_baud = 64 * 1024 * 1024;
+    // The ST7789 requires 16 ns between SPI rising edges.
+    // 16 ns = 62,500,000 Hz
+    static const uint32_t SPI_BAUD = 62'500'000;
 
   public:
     // frame buffer where pixel data is stored
     uint16_t *frame_buffer;
 
-    enum BG_SPI_SLOT {
-      BG_SPI_FRONT,
-      BG_SPI_BACK
-    };
-
-  public:
     ST7789(uint16_t width, uint16_t height, uint16_t *frame_buffer, BG_SPI_SLOT slot) :
       width(width), height(height), frame_buffer(frame_buffer) {
       switch(slot) {
+        case PICO_EXPLORER_ONBOARD:
+          cs = SPI_BG_FRONT_CS;
+          bl = PIN_UNUSED;
+          break;
         case BG_SPI_FRONT:
-          cs = 17;
-          bl = 20;
+          cs = SPI_BG_FRONT_CS;
+          bl = SPI_BG_FRONT_PWM;
           break;
         case BG_SPI_BACK:
-          cs = 22;
-          bl = 21;
+          cs = SPI_BG_BACK_CS;
+          bl = SPI_BG_BACK_PWM;
           break;
       }
     }
@@ -55,67 +60,30 @@ namespace pimoroni {
 
     ST7789(uint16_t width, uint16_t height, uint16_t *frame_buffer,
            spi_inst_t *spi,
-           uint8_t cs, uint8_t dc, uint8_t sck, uint8_t mosi, uint8_t miso = -1, uint8_t bl = -1) :
+           uint cs, uint dc, uint sck, uint mosi, uint miso = PIN_UNUSED, uint bl = PIN_UNUSED) :
       spi(spi),
       width(width), height(height),      
       cs(cs), dc(dc), sck(sck), mosi(mosi), miso(miso), bl(bl), frame_buffer(frame_buffer) {}
 
-    void init(bool auto_init_sequence = true, bool round = false);
+
+    //--------------------------------------------------
+    // Methods
+    //--------------------------------------------------
+  public:
+    void init(bool auto_init_sequence = true, bool round = false, uint32_t spi_baud = SPI_BAUD);
 
     spi_inst_t* get_spi() const;
-    int get_cs() const;
-    int get_dc() const;    
-    int get_sck() const;
-    int get_mosi() const;
-    int get_bl() const;
+    uint get_cs() const;
+    uint get_dc() const;
+    uint get_sck() const;
+    uint get_mosi() const;
+    uint get_bl() const;
 
     void command(uint8_t command, size_t len = 0, const char *data = NULL);
     void vsync_callback(gpio_irq_callback_t callback);
     void update(bool dont_block = false);
     void set_backlight(uint8_t brightness);
     void flip();
-
-    enum MADCTL : uint8_t {
-      ROW_ORDER   = 0b10000000,
-      COL_ORDER   = 0b01000000,
-      SWAP_XY     = 0b00100000,  // AKA "MV"
-      SCAN_ORDER  = 0b00010000,
-      RGB         = 0b00001000,
-      HORIZ_ORDER = 0b00000100
-    };
-
-    #define ROT_240_240_0      0
-    #define ROT_240_240_90     MADCTL::SWAP_XY | MADCTL::HORIZ_ORDER | MADCTL::COL_ORDER
-    #define ROT_240_240_180    MADCTL::SCAN_ORDER | MADCTL::HORIZ_ORDER | MADCTL::COL_ORDER | MADCTL::ROW_ORDER
-    #define ROT_240_240_270    MADCTL::SWAP_XY | MADCTL::HORIZ_ORDER | MADCTL::ROW_ORDER
-
-    enum reg {
-      SWRESET   = 0x01,
-      TEON      = 0x35,
-      MADCTL    = 0x36,
-      COLMOD    = 0x3A,
-      GCTRL     = 0xB7,
-      VCOMS     = 0xBB,
-      LCMCTRL   = 0xC0,
-      VDVVRHEN  = 0xC2,
-      VRHS      = 0xC3,
-      VDVS      = 0xC4,
-      FRCTRL2   = 0xC6,
-      PWRCTRL1  = 0xD0,
-      FRMCTR1   = 0xB1,
-      FRMCTR2   = 0xB2,
-      GMCTRP1   = 0xE0,
-      GMCTRN1   = 0xE1,
-      INVOFF    = 0x20,
-      SLPOUT    = 0x11,
-      DISPON    = 0x29,
-      GAMSET    = 0x26,
-      DISPOFF   = 0x28,
-      RAMWR     = 0x2C,
-      INVON     = 0x21,
-      CASET     = 0x2A,
-      RASET     = 0x2B
-    };
   };
 
 }

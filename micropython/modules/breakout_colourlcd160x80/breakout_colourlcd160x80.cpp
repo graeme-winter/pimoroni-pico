@@ -1,4 +1,4 @@
-#include "../../../pimoroni-pico/libraries/breakout_colourlcd160x80/breakout_colourlcd160x80.hpp"
+#include "libraries/breakout_colourlcd160x80/breakout_colourlcd160x80.hpp"
 
 #define MP_OBJ_TO_PTR2(o, t) ((t *)(uintptr_t)(o))
 
@@ -51,25 +51,7 @@ void BreakoutColourLCD160x80_print(const mp_print_t *print, mp_obj_t self_in, mp
 mp_obj_t BreakoutColourLCD160x80_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *all_args) {
     breakout_colourlcd160x80_BreakoutColourLCD160x80_obj_t *self = nullptr;
 
-    if(n_args <= 1) {
-        enum { ARG_buffer };
-        static const mp_arg_t allowed_args[] = {
-            { MP_QSTR_buffer, MP_ARG_REQUIRED | MP_ARG_OBJ },
-        };
-
-        // Parse args.
-        mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
-        mp_arg_parse_all_kw_array(n_args, n_kw, all_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
-
-        self = m_new_obj(breakout_colourlcd160x80_BreakoutColourLCD160x80_obj_t);
-        self->base.type = &breakout_colourlcd160x80_BreakoutColourLCD160x80_type;
-
-        mp_buffer_info_t bufinfo;
-        mp_get_buffer_raise(args[ARG_buffer].u_obj, &bufinfo, MP_BUFFER_RW);
-
-        self->breakout = new BreakoutColourLCD160x80((uint16_t *)bufinfo.buf);
-    }
-    else if(n_args == 2) {
+    if(n_args + n_kw == 2) {
         enum { ARG_buffer, ARG_slot };
         static const mp_arg_t allowed_args[] = {
             { MP_QSTR_buffer, MP_ARG_REQUIRED | MP_ARG_OBJ },
@@ -81,14 +63,14 @@ mp_obj_t BreakoutColourLCD160x80_make_new(const mp_obj_type_t *type, size_t n_ar
         mp_arg_parse_all_kw_array(n_args, n_kw, all_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
 
         int slot = args[ARG_slot].u_int;
-        if(slot == ST7735::BG_SPI_FRONT || slot == ST7735::BG_SPI_BACK) {
+        if(slot == BG_SPI_FRONT || slot == BG_SPI_BACK) {
             self = m_new_obj(breakout_colourlcd160x80_BreakoutColourLCD160x80_obj_t);
             self->base.type = &breakout_colourlcd160x80_BreakoutColourLCD160x80_type;
 
             mp_buffer_info_t bufinfo;
             mp_get_buffer_raise(args[ARG_buffer].u_obj, &bufinfo, MP_BUFFER_RW);
 
-            self->breakout = new BreakoutColourLCD160x80((uint16_t *)bufinfo.buf, (ST7735::BG_SPI_SLOT)slot);
+            self->breakout = new BreakoutColourLCD160x80((uint16_t *)bufinfo.buf, (BG_SPI_SLOT)slot);
         }
         else {
             mp_raise_ValueError("slot not a valid value. Expected 0 to 1");
@@ -98,12 +80,12 @@ mp_obj_t BreakoutColourLCD160x80_make_new(const mp_obj_type_t *type, size_t n_ar
         enum { ARG_buffer, ARG_spi, ARG_cs, ARG_dc, ARG_sck, ARG_mosi, ARG_bl };
         static const mp_arg_t allowed_args[] = {
             { MP_QSTR_buffer, MP_ARG_REQUIRED | MP_ARG_OBJ },
-            { MP_QSTR_spi, MP_ARG_REQUIRED | MP_ARG_INT },
-            { MP_QSTR_cs, MP_ARG_REQUIRED | MP_ARG_INT },
-            { MP_QSTR_dc, MP_ARG_REQUIRED | MP_ARG_INT },
-            { MP_QSTR_sck, MP_ARG_REQUIRED | MP_ARG_INT },
-            { MP_QSTR_mosi, MP_ARG_REQUIRED | MP_ARG_INT },
-            { MP_QSTR_bl, MP_ARG_INT, {.u_int = BreakoutColourLCD160x80::PIN_UNUSED} },
+            { MP_QSTR_spi, MP_ARG_INT, {.u_int = -1} },
+            { MP_QSTR_cs, MP_ARG_INT, {.u_int = ST7735::DEFAULT_CS_PIN} },
+            { MP_QSTR_dc, MP_ARG_INT, {.u_int = ST7735::DEFAULT_DC_PIN} },
+            { MP_QSTR_sck, MP_ARG_INT, {.u_int = ST7735::DEFAULT_SCK_PIN} },
+            { MP_QSTR_mosi, MP_ARG_INT, {.u_int = ST7735::DEFAULT_MOSI_PIN} },
+            { MP_QSTR_bl, MP_ARG_INT, {.u_int = ST7735::DEFAULT_BL_PIN} },
         };
 
         // Parse args.
@@ -115,17 +97,21 @@ mp_obj_t BreakoutColourLCD160x80_make_new(const mp_obj_type_t *type, size_t n_ar
 
         // Get SPI bus.
         int spi_id = args[ARG_spi].u_int;
+        int sck = args[ARG_sck].u_int;
+        int mosi = args[ARG_mosi].u_int;
+
+        if(spi_id == -1) {
+            spi_id = (sck >> 3) & 0b1;  // If no spi specified, choose the one for the given SCK pin
+        }
         if(spi_id < 0 || spi_id > 1) {
             mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("SPI(%d) doesn't exist"), spi_id);
         }
 
-        int sck = args[ARG_sck].u_int;
         if(!IS_VALID_SCK(spi_id, sck)) {
             mp_raise_ValueError(MP_ERROR_TEXT("bad SCK pin"));
         }
 
-        int mosi = args[ARG_mosi].u_int;
-        if(!IS_VALID_SCK(spi_id, mosi)) {
+        if(!IS_VALID_MOSI(spi_id, mosi)) {
             mp_raise_ValueError(MP_ERROR_TEXT("bad MOSI pin"));
         }
 
@@ -134,7 +120,7 @@ mp_obj_t BreakoutColourLCD160x80_make_new(const mp_obj_type_t *type, size_t n_ar
 
         spi_inst_t *spi = (spi_id == 0) ? spi0 : spi1;
         self->breakout = new BreakoutColourLCD160x80((uint16_t *)bufinfo.buf, spi,
-            args[ARG_cs].u_int, args[ARG_dc].u_int, sck, mosi, BreakoutColourLCD160x80::PIN_UNUSED, args[ARG_bl].u_int);
+            args[ARG_cs].u_int, args[ARG_dc].u_int, sck, mosi, PIN_UNUSED, args[ARG_bl].u_int);
     }
 
     self->breakout->init();
@@ -408,16 +394,11 @@ mp_obj_t BreakoutColourLCD160x80_character(size_t n_args, const mp_obj_t *pos_ar
     breakout_colourlcd160x80_BreakoutColourLCD160x80_obj_t *self = MP_OBJ_TO_PTR2(args[ARG_self].u_obj, breakout_colourlcd160x80_BreakoutColourLCD160x80_obj_t);
 
     int c = mp_obj_get_int(args[ARG_char].u_obj);
-    int x = args[ARG_y].u_int;
+    int x = args[ARG_x].u_int;
     int y = args[ARG_y].u_int;
+    int scale = args[ARG_scale].u_int;
 
-    Point p(x, y);
-    if(n_args == 4) {
-        int scale = args[ARG_scale].u_int;
-        self->breakout->character((char)c, p, scale);
-    }
-    else
-        self->breakout->character((char)c, p);
+    self->breakout->character((char)c, Point(x, y), scale);
 
     return mp_const_none;
 }
@@ -429,7 +410,7 @@ mp_obj_t BreakoutColourLCD160x80_text(size_t n_args, const mp_obj_t *pos_args, m
         { MP_QSTR_text, MP_ARG_REQUIRED | MP_ARG_OBJ },
         { MP_QSTR_x1, MP_ARG_REQUIRED | MP_ARG_INT },
         { MP_QSTR_y1, MP_ARG_REQUIRED | MP_ARG_INT },
-        { MP_QSTR_wr, MP_ARG_REQUIRED | MP_ARG_INT },
+        { MP_QSTR_wordwrap, MP_ARG_REQUIRED | MP_ARG_INT },
         { MP_QSTR_scale, MP_ARG_INT, {.u_int = 2} },
     };
 
@@ -438,22 +419,31 @@ mp_obj_t BreakoutColourLCD160x80_text(size_t n_args, const mp_obj_t *pos_args, m
 
     breakout_colourlcd160x80_BreakoutColourLCD160x80_obj_t *self = MP_OBJ_TO_PTR2(args[ARG_self].u_obj, breakout_colourlcd160x80_BreakoutColourLCD160x80_obj_t);
 
-    mp_check_self(mp_obj_is_str_or_bytes(args[ARG_text].u_obj));
-    GET_STR_DATA_LEN(args[ARG_text].u_obj, str, str_len);
+    mp_obj_t text_obj = args[ARG_text].u_obj;
+    if(mp_obj_is_str_or_bytes(text_obj)) {
+        GET_STR_DATA_LEN(text_obj, str, str_len);
 
-    std::string t((const char*)str);
+        std::string t((const char*)str);
 
-    int x = args[ARG_x].u_int;
-    int y = args[ARG_y].u_int;
-    int wrap = args[ARG_wrap].u_int;
-
-    Point p(x, y);
-    if(n_args == 5) {
+        int x = args[ARG_x].u_int;
+        int y = args[ARG_y].u_int;
+        int wrap = args[ARG_wrap].u_int;
         int scale = args[ARG_scale].u_int;
-        self->breakout->text(t, p, wrap, scale);
+
+        self->breakout->text(t, Point(x, y), wrap, scale);
     }
-    else
-        self->breakout->text(t, p, wrap);
+    else if(mp_obj_is_float(text_obj)) {
+        mp_raise_TypeError("can't convert 'float' object to str implicitly");
+    }
+    else if(mp_obj_is_int(text_obj)) {
+        mp_raise_TypeError("can't convert 'int' object to str implicitly");
+    }
+    else if(mp_obj_is_bool(text_obj)) {
+        mp_raise_TypeError("can't convert 'bool' object to str implicitly");
+    }
+    else {
+        mp_raise_TypeError("can't convert object to str implicitly");
+    }
 
     return mp_const_none;
 }

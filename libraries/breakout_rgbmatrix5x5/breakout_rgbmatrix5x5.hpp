@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../drivers/is31fl3731/is31fl3731.hpp"
+#include "drivers/is31fl3731/is31fl3731.hpp"
 
 namespace pimoroni {
     struct RGBLookup {
@@ -16,12 +16,16 @@ namespace pimoroni {
         static constexpr int8_t DEFAULT_I2C_ADDRESS    = 0x74;
         static constexpr int8_t ALTERNATE_I2C_ADDRESS  = 0x77;
 
-        void init();
+        bool init();
         void set_pixel(uint8_t x, uint8_t y, uint8_t r, uint8_t g, uint8_t b);
-  
-        BreakoutRGBMatrix5x5() : IS31FL3731(DEFAULT_I2C_ADDRESS)  {};
-        BreakoutRGBMatrix5x5(uint8_t address) : IS31FL3731(address) {};
-        BreakoutRGBMatrix5x5(i2c_inst_t *i2c, uint8_t address, uint8_t sda, uint8_t scl) : IS31FL3731(i2c, address, sda, scl) {};
+
+        BreakoutRGBMatrix5x5() : IS31FL3731(new I2C(I2C_BG_SDA, I2C_BG_SCL), DEFAULT_I2C_ADDRESS) {}
+
+        BreakoutRGBMatrix5x5(uint8_t address) : IS31FL3731(new I2C(I2C_DEFAULT_SDA, I2C_DEFAULT_SCL), address) {}
+      
+        BreakoutRGBMatrix5x5(I2C *i2c, uint8_t address = DEFAULT_I2C_ADDRESS) : IS31FL3731(i2c, address) {}
+
+        BreakoutRGBMatrix5x5(i2c_inst_t *i2c_inst, uint8_t address, uint8_t sda, uint8_t scl) : IS31FL3731(i2c_inst, address, sda, scl) {}
       private:
         RGBLookup lookup_pixel(uint8_t index);
 
